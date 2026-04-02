@@ -9,6 +9,7 @@ from tool_registry import get_tool_schemas
 from tools import execute_tool
 import tools as _tools_init  # ensure built-in tools are registered on import
 from providers import stream, AssistantTurn, TextChunk, ThinkingChunk, detect_provider
+from compaction import maybe_compact
 
 # ── Re-export event types (used by nano_claude.py) ────────────────────────
 __all__ = [
@@ -68,6 +69,9 @@ def run(
     while True:
         state.turn_count += 1
         assistant_turn: AssistantTurn | None = None
+
+        # Compact context if approaching window limit
+        maybe_compact(state, config)
 
         # Stream from provider (auto-detected from model name)
         for event in stream(

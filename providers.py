@@ -29,6 +29,7 @@ PROVIDERS: dict[str, dict] = {
     "anthropic": {
         "type":       "anthropic",
         "api_key_env": "ANTHROPIC_API_KEY",
+        "context_limit": 200000,
         "models": [
             "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001",
             "claude-opus-4-5", "claude-sonnet-4-5",
@@ -39,6 +40,7 @@ PROVIDERS: dict[str, dict] = {
         "type":       "openai",
         "api_key_env": "OPENAI_API_KEY",
         "base_url":   "https://api.openai.com/v1",
+        "context_limit": 128000,
         "models": [
             "gpt-4o", "gpt-4o-mini", "gpt-4-turbo",
             "o3-mini", "o1", "o1-mini",
@@ -48,6 +50,7 @@ PROVIDERS: dict[str, dict] = {
         "type":       "openai",
         "api_key_env": "GEMINI_API_KEY",
         "base_url":   "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "context_limit": 1000000,
         "models": [
             "gemini-2.5-pro-preview-03-25",
             "gemini-2.0-flash", "gemini-2.0-flash-lite",
@@ -58,6 +61,7 @@ PROVIDERS: dict[str, dict] = {
         "type":       "openai",
         "api_key_env": "MOONSHOT_API_KEY",
         "base_url":   "https://api.moonshot.cn/v1",
+        "context_limit": 128000,
         "models": [
             "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k",
             "kimi-latest",
@@ -67,6 +71,7 @@ PROVIDERS: dict[str, dict] = {
         "type":       "openai",
         "api_key_env": "DASHSCOPE_API_KEY",
         "base_url":   "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "context_limit": 1000000,
         "models": [
             "qwen-max", "qwen-plus", "qwen-turbo", "qwen-long",
             "qwen2.5-72b-instruct", "qwen2.5-coder-32b-instruct",
@@ -77,6 +82,7 @@ PROVIDERS: dict[str, dict] = {
         "type":       "openai",
         "api_key_env": "ZHIPU_API_KEY",
         "base_url":   "https://open.bigmodel.cn/api/paas/v4/",
+        "context_limit": 128000,
         "models": [
             "glm-4-plus", "glm-4", "glm-4-flash", "glm-4-air",
             "glm-z1-flash",
@@ -86,6 +92,7 @@ PROVIDERS: dict[str, dict] = {
         "type":       "openai",
         "api_key_env": "DEEPSEEK_API_KEY",
         "base_url":   "https://api.deepseek.com/v1",
+        "context_limit": 64000,
         "models": [
             "deepseek-chat", "deepseek-coder", "deepseek-reasoner",
         ],
@@ -95,6 +102,7 @@ PROVIDERS: dict[str, dict] = {
         "api_key_env": None,
         "base_url":   "http://localhost:11434/v1",
         "api_key":    "ollama",
+        "context_limit": 128000,
         "models": [
             "llama3.3", "llama3.2", "phi4", "mistral", "mixtral",
             "qwen2.5-coder", "deepseek-r1", "gemma3",
@@ -105,12 +113,14 @@ PROVIDERS: dict[str, dict] = {
         "api_key_env": None,
         "base_url":   "http://localhost:1234/v1",
         "api_key":    "lm-studio",
+        "context_limit": 128000,
         "models": [],   # dynamic, depends on loaded model
     },
     "custom": {
         "type":       "openai",
         "api_key_env": "CUSTOM_API_KEY",
         "base_url":   None,   # read from config["custom_base_url"]
+        "context_limit": 128000,
         "models": [],
     },
 }
