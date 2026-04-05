@@ -29,6 +29,7 @@ English | [中文](https://github.com/SafeRL-Lab/nano-claude-code/blob/main/docs
 
 
 ## 🔥🔥🔥 News (Pacific Time)
+- 09:00 AM, Apr 05, 2026: **v3.05.2** — Introduced `/proactive [duration]` command: a background daemon thread watches for user inactivity and automatically wakes the agent up after the specified interval (e.g. `/proactive 5m`), enabling continuous monitoring loops without user intervention. `/proactive` with no args now shows current status; `/proactive off` disables it explicitly. Proactive polling state is stored in `config` (no module-level globals). Watcher exceptions are logged via `traceback` instead of silently swallowed. Also fixed duplicated output in Rich-enabled terminals by buffering text during streaming and rendering Markdown once via `rich.live.Live` — updates happen in-place for a true streaming Markdown experience.
 - 10:51 PM, Apr 04, 2026: **v3.05_fix04** — Fixed a crash on `/model` and config save commands caused by the newly introduced `_run_query_callback` being serialized to JSON; also added `SleepTimer` usage    
   guidance to the system prompt so the agent knows when to invoke background timers proactively.
 - 10:28 PM, Apr 04, 2026: **v3.05_fix03** — Added a native `SleepTimer` tool that lets the agent schedule background timers and autonomously wake itself up after a delay — no user prompt required. Paired with a `threading.Lock` to prevent output collisions when background and foreground calls overlap. Also includes cross-platform fixes: Windows ANSI color support, CRLF-aware Edit tool matching, an interactive numbered menu for `/load`, native Ollama streaming via `/api/chat`, and auto-capping `max_tokens` per provider to prevent API errors. 
@@ -74,6 +75,7 @@ Nano Claude Code: **A Lightweight** and **Easy-to-Use** Python Reimplementation 
   * [AskUserQuestion Tool](#askuserquestion-tool)
   * [Task Management](#task-management)
   * [Voice Input](#voice-input)
+  * [Proactive Background Monitoring](#proactive-background-monitoring)
   * [Context Compression](#context-compression)
   * [Diff View](#diff-view)
   * [CLAUDE.md Support](#claudemd-support)
@@ -97,8 +99,8 @@ Claude Code is a powerful, production-grade AI coding assistant — but its sour
 | Language | TypeScript + React/Ink | Python 3.8+ |
 | Source files | ~1,332 TS/TSX files | 51 Python files |
 | Lines of code | ~283K | ~11.6K |
-| Built-in tools | 44+ | 23 |
-| Slash commands | 88 | 18 |
+| Built-in tools | 44+ | 25 |
+| Slash commands | 88 | 19 |
 | Voice input | Proprietary Anthropic WebSocket (OAuth required) | Local Whisper / OpenAI API — works offline, no subscription |
 | Model providers | Anthropic only | 7+ (Anthropic · OpenAI · Gemini · Kimi · Qwen · DeepSeek · Ollama · …) |
 | Local models | No | Yes — Ollama, LM Studio, vLLM, any OpenAI-compatible endpoint |
@@ -126,6 +128,8 @@ Claude Code is a powerful, production-grade AI coding assistant — but its sour
 - **Notebook editing** — `NotebookEdit` directly manipulates `.ipynb` JSON (replace/insert/delete cells) with no kernel required.
 - **Diagnostics without LSP server** — `GetDiagnostics` chains pyright → mypy → flake8 → py_compile for Python and tsc/shellcheck for other languages, with zero configuration.
 - **Offline voice input** — `/voice` records via `sounddevice`/`arecord`/SoX, transcribes with local `faster-whisper` (no API key, no subscription), and auto-submits. Keyterms from your git branch and project files boost coding-term accuracy.
+- **Proactive background monitoring** — `/proactive 5m` activates a sentinel daemon that wakes the agent automatically after a period of inactivity, enabling continuous monitoring loops, scheduled checks, or trading bots without user prompts.
+- **Rich Live streaming rendering** — When `rich` is installed, responses stream as live-updating Markdown in place (no duplicate raw text), with clean tool-call interleaving.
 
 ### Key design differences
 
@@ -160,7 +164,7 @@ Claude Code is a powerful, production-grade AI coding assistant — but its sour
 | Multi-provider | Anthropic · OpenAI · Gemini · Kimi · Qwen · Zhipu · DeepSeek · Ollama · LM Studio · Custom endpoint |
 | Interactive REPL | readline history, Tab-complete slash commands |
 | Agent loop | Streaming API + automatic tool-use loop |
-| 23 built-in tools | Read · Write · Edit · Bash · Glob · Grep · WebFetch · WebSearch · **NotebookEdit** · **GetDiagnostics** · MemorySave · MemoryDelete · MemorySearch · MemoryList · Agent · SendMessage · CheckAgentResult · ListAgentTasks · ListAgentTypes · Skill · SkillList · AskUserQuestion · TaskCreate/Update/Get/List · *(MCP + plugin tools auto-added at startup)* |
+| 25 built-in tools | Read · Write · Edit · Bash · Glob · Grep · WebFetch · WebSearch · **NotebookEdit** · **GetDiagnostics** · MemorySave · MemoryDelete · MemorySearch · MemoryList · Agent · SendMessage · CheckAgentResult · ListAgentTasks · ListAgentTypes · Skill · SkillList · AskUserQuestion · TaskCreate/Update/Get/List · **SleepTimer** · *(MCP + plugin tools auto-added at startup)* |
 | MCP integration | Connect any MCP server (stdio/SSE/HTTP), tools auto-registered and callable by Claude |
 | Plugin system | Install/uninstall/enable/disable/update plugins from git URLs or local paths; multi-scope (user/project); recommendation engine |
 | AskUserQuestion | Claude can pause and ask the user a clarifying question mid-task, with optional numbered choices |
@@ -172,8 +176,10 @@ Claude Code is a powerful, production-grade AI coding assistant — but its sour
 | Skills | Built-in `/commit` · `/review` + custom markdown skills with argument substitution and fork/inline execution |
 | Plugin tools | Register custom tools via `tool_registry.py` |
 | Permission system | `auto` / `accept-all` / `manual` modes |
-| 18 slash commands | `/model` · `/config` · `/save` · `/cost` · `/memory` · `/skills` · `/agents` · `/voice` · … |
+| 19 slash commands | `/model` · `/config` · `/save` · `/cost` · `/memory` · `/skills` · `/agents` · `/voice` · `/proactive` · … |
 | Voice input | Record → transcribe → auto-submit. Backends: `sounddevice` / `arecord` / SoX + `faster-whisper` / `openai-whisper` / OpenAI API. Works fully offline. |
+| Proactive monitoring | `/proactive [duration]` starts a background sentinel daemon; agent wakes automatically after inactivity, enabling continuous monitoring loops without user prompts |
+| Rich Live streaming | When `rich` is installed, responses render as live-updating Markdown in place — no duplicate raw text, clean tool-call interleaving |
 | Context injection | Auto-loads `CLAUDE.md`, git status, cwd, persistent memory |
 | Session persistence | Save / load conversations to `~/.nano_claude/sessions/`; **autosave on exit** + `/resume` to instantly restore last session |
 | Extended Thinking | Toggle on/off (Claude models only) |
@@ -593,6 +599,9 @@ Type `/` and press **Tab** to autocomplete.
 | `/voice` | Record voice, transcribe with Whisper, auto-submit as prompt |
 | `/voice status` | Show recording and STT backend availability |
 | `/voice lang <code>` | Set STT language (e.g. `zh`, `en`, `ja`; `auto` to detect) |
+| `/proactive` | Show current proactive polling status (ON/OFF and interval) |
+| `/proactive <duration>` | Enable background sentinel polling (e.g. `5m`, `30s`, `1h`) |
+| `/proactive off` | Disable background polling |
 | `/exit` / `/quit` | Exit |
 
 **Switching models inside a session:**
@@ -726,6 +735,12 @@ Keys are saved to `~/.nano_claude/config.json` and loaded automatically on next 
 | `CheckAgentResult` | Check status/result of a background agent | `task_id` |
 | `ListAgentTasks` | List all active and finished agent tasks | — |
 | `ListAgentTypes` | List available agent type definitions | — |
+
+### Background & Autonomy Tools
+
+| Tool | Description | Key Parameters |
+|---|---|---|
+| `SleepTimer` | Schedule a silent background timer; injects an automated wake-up prompt when it fires so the agent can resume monitoring or deferred tasks | `seconds` |
 
 ### Skill Tools
 
@@ -1243,6 +1258,58 @@ These are passed as Whisper's `initial_prompt` so the STT engine prefers correct
 
 ---
 
+## Proactive Background Monitoring
+
+Nano Claude Code v3.05.2 adds a **sentinel daemon** that automatically wakes the agent after a configurable period of inactivity — no user prompt required. This enables use cases like continuous log monitoring, market script polling, or scheduled code checks.
+
+### Quick start
+
+```
+[myproject] ❯ /proactive 5m
+Proactive background polling: ON  (triggering every 300s of inactivity)
+
+[myproject] ❯ keep monitoring the build log and alert me if errors appear
+
+╭─ Claude ● ─────────────────────────
+│ Understood. I'll check the build log each time I wake up.
+
+[Background Event Triggered]
+╭─ Claude ● ─────────────────────────
+│ ⚙ Bash(tail -50 build.log)
+│ ✓ → Build failed: ImportError in auth.py line 42
+│ **Action needed:** fix the import before the next CI run.
+```
+
+### Commands
+
+| Command | Description |
+|---|---|
+| `/proactive` | Show current status (ON/OFF and interval) |
+| `/proactive 5m` | Enable — trigger every 5 minutes of inactivity |
+| `/proactive 30s` | Enable — trigger every 30 seconds |
+| `/proactive 1h` | Enable — trigger every hour |
+| `/proactive off` | Disable sentinel polling |
+
+Duration suffix: `s` = seconds, `m` = minutes, `h` = hours. Plain integer = seconds.
+
+### How it works
+
+- A background daemon thread starts when the REPL launches (paused by default).
+- The daemon checks elapsed time since the last user or agent interaction every second.
+- When the inactivity threshold is reached, it calls the agent with a wake-up prompt.
+- The `threading.Lock` used by the main agent loop ensures wake-ups never interrupt an active session — they queue and fire after the current turn completes.
+- Watcher exceptions are logged via `traceback` so failures are visible and debuggable.
+
+### Complements SleepTimer
+
+| | `SleepTimer` | `/proactive` |
+|---|---|---|
+| Who initiates | The agent | The user |
+| Trigger | After a fixed delay from now | After N seconds of inactivity |
+| Use case | "Check back in 10 minutes" | "Keep watching until I stop typing" |
+
+---
+
 ## Context Compression
 
 Long conversations are automatically compressed to stay within the model's context window.
@@ -1352,7 +1419,7 @@ You can also resume a specific file:
 
 ```
 nano_claude_code/
-├── nano_claude.py        # Entry point: REPL + slash commands + diff rendering
+├── nano_claude.py        # Entry point: REPL + slash commands + diff rendering + Rich Live streaming + proactive sentinel daemon
 ├── agent.py              # Agent loop: streaming, tool dispatch, compaction
 ├── providers.py          # Multi-provider: Anthropic, OpenAI-compat streaming
 ├── tools.py              # Core tools (Read/Write/Edit/Bash/Glob/Grep/Web/NotebookEdit/GetDiagnostics) + registry wiring

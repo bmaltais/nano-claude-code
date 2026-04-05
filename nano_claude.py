@@ -72,6 +72,7 @@ import threading
 try:
     from rich.console import Console
     from rich.markdown import Markdown
+    from rich.live import Live
     from rich.syntax import Syntax
     from rich.panel import Panel
     from rich import print as rprint
@@ -127,26 +128,48 @@ def _has_diff(text: str) -> bool:
 # ── Conversation rendering ─────────────────────────────────────────────────
 
 _accumulated_text: list[str] = []   # buffer text during streaming
+_current_live: "Live | None" = None  # active Rich Live instance (one at a time)
 
-def stream_text(chunk: str):
-    """Called for each streamed text chunk."""
+def _make_renderable(text: str):
+    """Return a Rich renderable: Markdown if text contains markup, else plain."""
+    if any(c in text for c in ("#", "*", "`", "_", "[")):
+        return Markdown(text)
+    return text
+
+def _start_live() -> None:
+    """Start a Rich Live block for in-place Markdown streaming (no-op if not Rich)."""
+    global _current_live
+    if _RICH and _current_live is None:
+        _current_live = Live(console=console, auto_refresh=False,
+                             vertical_overflow="visible")
+        _current_live.start()
+
+def stream_text(chunk: str) -> None:
+    """Buffer chunk; update Live in-place when Rich available, else print directly."""
+    global _current_live
     _accumulated_text.append(chunk)
-    if not _RICH:
+    if _RICH:
+        if _current_live is None:
+            _start_live()
+        _current_live.update(_make_renderable("".join(_accumulated_text)), refresh=True)
+    else:
         print(chunk, end="", flush=True)
 
 def stream_thinking(chunk: str, verbose: bool):
     if verbose:
         print(clr(chunk, "dim"), end="", flush=True)
 
-def flush_response():
-    """After streaming, render buffered text (as Markdown if Rich is available)."""
+def flush_response() -> None:
+    """Commit buffered text to screen: stop Live (freezes rendered Markdown in place)."""
+    global _current_live
     full = "".join(_accumulated_text)
     _accumulated_text.clear()
-    if _RICH and full.strip():
-        if any(c in full for c in ("#", "*", "`", "_", "[")):
-            console.print(Markdown(full))
-        else:
-            console.print(full)
+    if _current_live is not None:
+        _current_live.stop()
+        _current_live = None
+    elif _RICH and full.strip():
+        # Fallback: no Live was running but Rich is available (e.g. after thinking)
+        console.print(_make_renderable(full))
     else:
         print()  # ensure newline after plain-text stream
 
@@ -1230,43 +1253,50 @@ def repl(config: dict, initial_prompt: str = None):
             
             if is_background:
                 print(clr("\n\n[Background Event Triggered]", "yellow"))
-    
+
             print(clr("\n╭─ Claude ", "dim") + clr("●", "green") + clr(" ─────────────────────────", "dim"))
-            print(clr("│ ", "dim"), end="", flush=True)
-    
+            if not _RICH:
+                print(clr("│ ", "dim"), end="", flush=True)
+
             thinking_started = False
-    
+
             for event in run(user_input, state, config, system_prompt):
                 if isinstance(event, TextChunk):
+                    # stream_text auto-starts Live on first chunk when Rich available
                     stream_text(event.text)
-    
+
                 elif isinstance(event, ThinkingChunk):
                     if verbose:
+                        flush_response()  # stop Live before printing static thinking
                         if not thinking_started:
                             print(clr("\n  [thinking]", "dim"))
                             thinking_started = True
                         stream_thinking(event.text, verbose)
-    
+
                 elif isinstance(event, ToolStart):
-                    flush_response()
+                    flush_response()  # stop Live, commit text so far
                     print_tool_start(event.name, event.inputs, verbose)
-    
+
                 elif isinstance(event, PermissionRequest):
+                    flush_response()  # stop Live before interactive prompt
                     event.granted = ask_permission_interactive(event.description, config)
-    
+                    # Live will restart automatically on next TextChunk
+
                 elif isinstance(event, ToolEnd):
                     print_tool_end(event.name, event.result, verbose)
-                    # Print prefix for next text
-                    print(clr("│ ", "dim"), end="", flush=True)
-    
+                    if not _RICH:
+                        print(clr("│ ", "dim"), end="", flush=True)
+                    # Live will restart automatically on next TextChunk
+
                 elif isinstance(event, TurnDone):
                     if verbose:
+                        flush_response()  # stop Live before printing token info
                         print(clr(
                             f"\n  [tokens: +{event.input_tokens} in / "
                             f"+{event.output_tokens} out]", "dim"
                         ))
 
-            flush_response()
+            flush_response()  # stop Live, commit any remaining text
             print(clr("╰──────────────────────────────────────────────", "dim"))
             print()
             
